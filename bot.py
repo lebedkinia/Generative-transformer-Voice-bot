@@ -29,9 +29,9 @@ async def message_handlers(message: Message):
         file = await bot.get_file(file_id)
         file_path = file.file_path
         await bot.download_file(file_path, "message.wav")
-        trans = transcribe_audio("message.wav")
-        ask(trans)
-        await message.answer(ask(trans))
+        tRaNs = transcribe_audio("message.wav")
+        ask(tRaNs)
+        await message.answer(ask(tRaNs))
     else:
         
         await message.answer(ask(message.text))
