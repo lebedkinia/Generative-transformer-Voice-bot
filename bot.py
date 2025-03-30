@@ -6,6 +6,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 from utils.config import BOT_TOKEN
 from utils.speech_to_text import transcribe_audio
+from utils.chatgpt_api import ask
 
 
 logging.basicConfig(level=logging.INFO)
@@ -29,9 +30,11 @@ async def message_handlers(message: Message):
         file_path = file.file_path
         await bot.download_file(file_path, "message.wav")
         trans = transcribe_audio("message.wav")
-        await message.answer(trans)
+        ask(trans)
+        await message.answer(ask(trans))
     else:
-        await message.answer(f"Вы отправили: {message.text}")
+        
+        await message.answer(ask(message.text))
 
 
 dp.include_router(router)
