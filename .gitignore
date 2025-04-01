@@ -1,4 +1,5 @@
 venv
 .gitignore
 config.py
+response.wav
 message.wav

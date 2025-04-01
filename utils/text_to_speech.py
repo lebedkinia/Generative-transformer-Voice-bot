@@ -1,11 +1,11 @@
 from groq import Groq
 from utils.config import GROQ_API_KEY
 
-def text_to_speech1(text, filename="response.ogg"):
+def text_to_speech1(text, filename="response.ogg", voice_ai="Ahmad-PlayAI"):
     client = Groq(api_key=GROQ_API_KEY)
     response = client.audio.speech.create(
         model="playai-tts-arabic",
-        voice="Ahmad-PlayAI",
+        voice=voice_ai,
         input=text,
         response_format="wav"
     )
