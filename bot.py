@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram import Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, FSInputFile, ReplyKeyboardMarkup, KeyboardButton, InputFile
-from utils.config import BOT_TOKEN
+from dotenv import load_dotenv
 from utils.speech_to_text import transcribe_audio
 from utils.chatgpt_api import ask
 from utils.text_to_speech import text_to_speech1
@@ -16,8 +16,9 @@ import requests
 from io import BytesIO
 
 logging.basicConfig(level=logging.INFO)
+load_dotenv()
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 router = Router()
 

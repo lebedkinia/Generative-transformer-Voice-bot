@@ -1,8 +1,11 @@
 from groq import Groq
-from utils.config import GROQ_API_KEY
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 def text_to_speech1(text, filename="response.ogg", voice_ai="Ahmad-PlayAI"):
-    client = Groq(api_key=GROQ_API_KEY)
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
     response = client.audio.speech.create(
         model="playai-tts-arabic",
         voice=voice_ai,
