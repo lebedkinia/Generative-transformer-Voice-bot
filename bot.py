@@ -52,7 +52,7 @@ def get_voice_keyboard():
         keyboard=[
             [KeyboardButton(text="Ахмед")],
             [KeyboardButton(text="Кхалид")],
-            [KeyboardButton(text="Амира")]
+            [KeyboardButton(text="Амира")],
             [KeyboardButton(text="↩️ Назад")]
         ],
         resize_keyboard=True,
