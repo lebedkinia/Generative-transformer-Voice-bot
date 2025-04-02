@@ -1,9 +1,11 @@
 from groq import Groq
-from utils.config import GROQ_API_KEY
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
 def ask(content: str):
-    client = Groq(api_key=GROQ_API_KEY)
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     completion = client.chat.completions.create(
         model="gemma2-9b-it",
