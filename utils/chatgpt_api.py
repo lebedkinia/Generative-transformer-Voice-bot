@@ -8,7 +8,7 @@ def ask(content: str):
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     completion = client.chat.completions.create(
-        model="gemma2-9b-it",
+        model="qwen-2.5-32b",
         messages=[
             {
                 "role": "user",
