@@ -1,4 +1,6 @@
 venv
 .gitignore
-config.py
+.env
+utils/.env
+response.wav
 message.wav
