@@ -10,6 +10,7 @@ from utils.speech_to_text import transcribe_audio
 from utils.chatgpt_api import ask
 from utils.text_to_speech import text_to_speech1
 from utils.generation_image import generate_image
+from utils.description_image import get_image_description
 import os
 import tempfile
 import requests
@@ -24,12 +25,14 @@ router = Router()
 
 user_preferences = {}
 image_generation_mode = {}
+photo_description_mode = {}
 
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="⚙️ Настройки")],
-            [KeyboardButton(text="🎨 Сгенерировать изображение")]
+            [KeyboardButton(text="🎨 Сгенерировать изображение")],
+            [KeyboardButton(text="📷 Описать фото")]  
         ],
         resize_keyboard=True,
         persistent=True
@@ -101,6 +104,14 @@ async def settings_command(message: Message):
         reply_markup=get_settings_keyboard()
     )
 
+@router.message(F.text == "📷 Описать фото")
+async def enable_photo_description(message: Message):
+    photo_description_mode[message.from_user.id] = True
+    await message.answer(
+        "Отправьте фото для описания:",
+        reply_markup=get_main_keyboard()
+    )
+
 @router.message(F.text == "🤖 Выбрать голос бота")
 async def voice_choice(message: Message):
     await message.answer(
@@ -162,7 +173,35 @@ async def handle_messages(message: Message):
     if user_id not in user_preferences:
         await start_command(message)
         return
+    if photo_description_mode.get(user_id, False):
+        photo_description_mode[user_id] = False
     
+        try:
+            file_id = message.photo[-1].file_id
+            file = await bot.get_file(file_id)
+            file_path = file.file_path
+            
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
+                await bot.download_file(file_path, tmp_file.name)
+                tmp_path = tmp_file.name
+            
+            description = get_image_description(tmp_path)
+            
+            await message.answer(
+                f"📸 Описание фото:\n{description}",
+                reply_markup=get_main_keyboard()
+            )
+            
+        except Exception as e:
+            logging.error(f"Ошибка обработки фото: {str(e)}")
+            await message.answer(
+                "⚠️ Не удалось обработать фото. Попробуйте другое изображение.",
+                reply_markup=get_main_keyboard()
+            )
+            
+        finally:
+            if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
     if image_generation_mode.get(user_id, False):
         image_generation_mode[message.from_user.id] = False
     
