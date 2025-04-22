@@ -37,6 +37,15 @@ def init_db():
         created_at TEXT
     )
     ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS suggestions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
+        suggestion TEXT,
+        created_at TEXT
+    )
+    ''')
     conn.commit()
     conn.close()
 
@@ -52,10 +61,14 @@ class FeedbackStates(StatesGroup):
     rating = State()
     comment = State()
 
+class SuggestionStates(StatesGroup):
+    waiting_for_suggestion = State()
+
 user_preferences = {}
 image_generation_mode = {}
 photo_description_mode = {}
 feedback_mode = {}
+suggestion_mode = {}
 
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
@@ -63,7 +76,10 @@ def get_main_keyboard():
             [KeyboardButton(text="⚙️ Настройки")],
             [KeyboardButton(text="🎨 Сгенерировать изображение")],
             [KeyboardButton(text="📷 Описать фото")],
-            [KeyboardButton(text="💬 Оставить отзыв")]  
+            [
+                KeyboardButton(text="💬 Оставить отзыв"),
+                KeyboardButton(text="💡 Предложить улучшение")
+            ]  
         ],
         resize_keyboard=True,
         persistent=True
@@ -128,6 +144,16 @@ async def save_feedback(user_id: int, username: str, model: str, rating: int, co
     conn.commit()
     conn.close()
 
+async def save_suggestion(user_id: int, username: str, suggestion: str):
+    conn = sqlite3.connect('feedback.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+    INSERT INTO suggestions (user_id, username, suggestion, created_at)
+    VALUES (?, ?, ?, ?)
+    ''', (user_id, username or f"user_{user_id}", suggestion, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
 @router.message(CommandStart())
 async def start_command(message: Message):
     user_preferences[message.from_user.id] = {
@@ -137,6 +163,7 @@ async def start_command(message: Message):
     image_generation_mode[message.from_user.id] = False
     photo_description_mode[message.from_user.id] = False
     feedback_mode[message.from_user.id] = False
+    suggestion_mode[message.from_user.id] = False
     await message.answer(
         "Привет! Я многофункциональный бот:\n"
         "- Отвечаю на вопросы текстом/голосом\n"
@@ -145,6 +172,43 @@ async def start_command(message: Message):
         "Выбери действие:",
         reply_markup=get_main_keyboard()
     )
+
+@router.message(F.text == "💡 Предложить улучшение")
+async def start_suggestion(message: Message, state: FSMContext):
+    await state.set_state(SuggestionStates.waiting_for_suggestion)
+    suggestion_mode[message.from_user.id] = True
+    await message.answer(
+        "Пожалуйста, напишите ваше предложение по улучшению бота:",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="↩️ Отменить")]],
+            resize_keyboard=True
+        )
+    )
+
+@router.message(SuggestionStates.waiting_for_suggestion, F.text == "↩️ Отменить")
+async def cancel_suggestion(message: Message, state: FSMContext):
+    await state.clear()
+    suggestion_mode[message.from_user.id] = False
+    await message.answer(
+        "Отправка предложения отменена.",
+        reply_markup=get_main_keyboard()
+    )
+
+@router.message(SuggestionStates.waiting_for_suggestion)
+async def process_suggestion(message: Message, state: FSMContext):
+    suggestion = message.text
+    await save_suggestion(
+        user_id=message.from_user.id,
+        username=message.from_user.username,
+        suggestion=suggestion
+    )
+    
+    await message.answer(
+        "Спасибо за ваше предложение! Мы обязательно рассмотрим его для улучшения бота.",
+        reply_markup=get_main_keyboard()
+    )
+    await state.clear()
+    suggestion_mode[message.from_user.id] = False
 
 @router.message(F.text == "💬 Оставить отзыв")
 async def start_feedback(message: Message, state: FSMContext):
@@ -203,7 +267,7 @@ async def set_comment(message: Message, state: FSMContext):
 async def enable_image_generation(message: Message):
     image_generation_mode[message.from_user.id] = True
     await message.answer(
-        "Режим генерации изображения активирован. Отправьте текстовый промпт для генерации изображения:",
+        "Режим генерации изображения активирован. Отправьте промпт для генерации изображения:",
         reply_markup=get_main_keyboard()
     )
 
@@ -286,6 +350,10 @@ async def handle_messages(message: Message):
     if user_id not in user_preferences:
         await start_command(message)
         return
+        
+    if suggestion_mode.get(user_id, False):
+        return
+        
     if photo_description_mode.get(user_id, False):
         photo_description_mode[user_id] = False
     
@@ -315,13 +383,25 @@ async def handle_messages(message: Message):
         finally:
             if 'tmp_path' in locals() and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
+                
     if image_generation_mode.get(user_id, False):
         image_generation_mode[message.from_user.id] = False
-    
+        
         processing_msg = await message.answer("🖌️ Генерация изображения... это может занять некоторое время")
         
         try:
-            result = generate_image(message.text)
+            if message.voice:
+                file_id = message.voice.file_id
+                file = await bot.get_file(file_id)
+                file_path = file.file_path
+                await bot.download_file(file_path, "voice_prompt.wav")
+                prompt = transcribe_audio("voice_prompt.wav")
+                os.remove("voice_prompt.wav")
+                await message.answer(f"🎤 Распознанный текст: {prompt}")
+            else:
+                prompt = message.text
+            
+            result = generate_image(prompt)
             
             if not result:
                 await message.answer("Не удалось сгенерировать изображение. Попробуйте другой запрос.")
@@ -367,7 +447,8 @@ async def handle_messages(message: Message):
     
     if message.text in ["⚙️ Настройки", "↩️ Назад", "🎧 Всегда отвечать голосом", 
                        "📄 Всегда отвечать текстом", "🤖 Выбрать голос бота",
-                       "Ахмед", "Кхалид", "Амира", "🎨 Сгенерировать изображение"]:
+                       "Ахмед", "Кхалид", "Амира", "🎨 Сгенерировать изображение",
+                       "💡 Предложить улучшение", "💬 Оставить отзыв"]:
         return
     
     preferences = user_preferences[user_id]
