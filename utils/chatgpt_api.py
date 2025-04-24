@@ -4,6 +4,7 @@ import os
 
 load_dotenv()
 
+
 def ask(content: str):
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -21,7 +22,6 @@ def ask(content: str):
         stream=False,
         stop=None,
     )
-
 
     print(completion.choices[0].message.to_dict()["content"])
     return completion.choices[0].message.to_dict()["content"]

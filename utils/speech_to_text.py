@@ -4,6 +4,7 @@ import os
 
 load_dotenv()
 
+
 def transcribe_audio(filename):
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 

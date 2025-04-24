@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def get_image_description(image_path):
     try:
         # Загружаем изображение
@@ -18,7 +19,7 @@ def get_image_description(image_path):
             headers={"Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"},
             data=image_bytes
         )
-        
+
         # Проверка ответа
         if response.status_code == 200:
             result = response.json()
@@ -30,9 +31,10 @@ def get_image_description(image_path):
         elif response.status_code == 503:
             # Модель может загружаться
             raise Exception("Сервис временно недоступен. Попробуйте позже.")
-        
-        raise Exception(f"Не удалось обработать изображение. Код ошибки: {response.status_code}")
-    
+
+        raise Exception(
+            f"Не удалось обработать изображение. Код ошибки: {response.status_code}")
+
     except Exception as e:
         logging.error(f"Ошибка в get_image_description: {str(e)}")
         raise
