@@ -390,7 +390,6 @@ async def back_command(message: Message):
     )
 
 
-# Обработчики настроек чата
 @router.message(F.text == "🎧 Отвечать голосом (чат)")
 async def set_chat_voice_response(message: Message):
     init_user_preferences(message.from_user.id)
@@ -426,7 +425,6 @@ async def set_chat_amira_voice(message: Message):
     await message.answer("В чате буду отвечать голосом Амиры.", reply_markup=get_main_keyboard())
 
 
-# Обработчики настроек фото
 @router.message(F.text == "🎧 Отвечать голосом (фото)")
 async def set_photo_voice_response(message: Message):
     init_user_preferences(message.from_user.id)
@@ -461,77 +459,72 @@ async def set_photo_amira_voice(message: Message):
     user_preferences[message.from_user.id]["photo_voice"] = "Amira-PlayAI"
     await message.answer("Описание фото буду отправлять голосом Амиры.", reply_markup=get_main_keyboard())
 
+
 async def handle_chat_mode(message: Message):
     user_id = message.from_user.id
-    
-    # Получаем настройки пользователя для чата
+
     preferences = user_preferences.get(user_id, {
         "chat_output": "text",
         "chat_voice": "Ahmad-PlayAI"
     })
-    
-    # Обрабатываем входящее сообщение
+
     if message.voice:
-        # Транскрибируем голосовое сообщение
         try:
             processing_msg = await message.answer("🔊 Обрабатываю голосовое сообщение...")
-            
+
             file_id = message.voice.file_id
             file = await bot.get_file(file_id)
             file_path = file.file_path
-            
+
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
                 await bot.download_file(file_path, tmp_file.name)
                 tmp_path = tmp_file.name
-            
-            # Транскрипция аудио в текст
+
             user_text = transcribe_audio(tmp_path)
             os.unlink(tmp_path)
-            
+
             await bot.delete_message(chat_id=message.chat.id, message_id=processing_msg.message_id)
-            
+
             if not user_text:
                 await message.answer("❌ Не удалось распознать голосовое сообщение. Попробуйте ещё раз.")
                 return
-                
+
             await message.answer(f"🎤 Вы сказали:\n\n{user_text}")
-            
+
         except Exception as e:
             logging.error(f"Voice processing error: {str(e)}")
             await message.answer("❌ Произошла ошибка при обработке голосового сообщения")
             return
-            
+
     elif message.text:
         user_text = message.text
     else:
-        return  # Игнорируем другие типы сообщений
-    
-    # Получаем ответ от ИИ
+        return
+
     try:
         thinking_msg = await message.answer("💭 Думаю над ответом...")
         response_text = ask(user_text)
         await bot.delete_message(chat_id=message.chat.id, message_id=thinking_msg.message_id)
-        
+
         if not response_text:
             await message.answer("❌ Не удалось получить ответ. Попробуйте ещё раз.")
             return
-            
+
     except Exception as e:
         logging.error(f"Chat error: {str(e)}")
         await message.answer("❌ Произошла ошибка при генерации ответа")
         return
-    
-    # Отправляем ответ в соответствии с настройками
+
     if preferences["chat_output"] == "voice":
         try:
             converting_msg = await message.answer("🔊 Преобразую ответ в голос...")
-            
+
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
                 audio_path = tmp_file.name
-            
-            # Генерация голосового ответа
-            success = text_to_speech1(response_text, audio_path, preferences["chat_voice"])
-            
+
+            success = text_to_speech1(
+                response_text, audio_path, preferences["chat_voice"])
+
             if success:
                 await message.answer_voice(
                     FSInputFile(audio_path),
@@ -543,34 +536,32 @@ async def handle_chat_mode(message: Message):
                     f"💬 Ответ на ваше сообщение:\n\n{response_text}",
                     reply_markup=get_main_keyboard()
                 )
-            
+
             os.unlink(audio_path)
             await bot.delete_message(chat_id=message.chat.id, message_id=converting_msg.message_id)
-            
+
         except Exception as e:
             logging.error(f"Voice generation error: {str(e)}")
             await message.answer(
                 f"💬 Ответ на ваше сообщение:\n\n{response_text}",
                 reply_markup=get_main_keyboard()
             )
-            
+
     else:
-        # Текстовый ответ
         await message.answer(
             f"💬 Ответ на ваше сообщение:\n\n{response_text}",
             reply_markup=get_main_keyboard()
         )
 
+
 @router.message()
 async def handle_messages(message: Message):
     user_id = message.from_user.id
 
-    # Инициализация пользователя, если нужно
     if user_id not in user_preferences:
         await start_command(message)
         return
 
-    # Функция для сброса всех режимов
     def reset_all_modes():
         nonlocal user_id
         image_generation_mode[user_id] = False
@@ -578,7 +569,6 @@ async def handle_messages(message: Message):
         feedback_mode[user_id] = False
         suggestion_mode[user_id] = False
 
-    # Обработка команд активации режимов (с автоматическим сбросом других режимов)
     if message.text == "💬 Чат бот с ИИ":
         reset_all_modes()
         await message.answer(
@@ -640,7 +630,6 @@ async def handle_messages(message: Message):
         await handle_chat_mode(message)
         return
 
-    # Если это обработка предложения
     if suggestion_mode.get(user_id, False):
         suggestion = message.text
         await save_suggestion(
@@ -654,7 +643,6 @@ async def handle_messages(message: Message):
         )
         return
 
-    # Если это обработка фото для описания
     if photo_description_mode.get(user_id, False):
         try:
             if not message.photo:
@@ -671,17 +659,13 @@ async def handle_messages(message: Message):
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
                 await bot.download_file(file_path, tmp_file.name)
                 tmp_path = tmp_file.name
-
-            # Получаем описание изображения
             description = get_image_description(tmp_path)
 
-            # Определяем как отправлять описание (голос/текст)
             output_type = user_preferences[user_id].get("photo_output", "text")
             voice_model = user_preferences[user_id].get(
                 "photo_voice", "Ahmad-PlayAI")
 
             if output_type == "voice":
-                # Конвертируем текст в голос
                 audio_file = text_to_speech1(
                     description, "photo_description.ogg", voice_model)
                 if audio_file:
@@ -715,13 +699,11 @@ async def handle_messages(message: Message):
                 os.unlink(tmp_path)
         return
 
-    # Если это генерация изображения
     if image_generation_mode.get(user_id, False):
         processing_msg = await message.answer("🎨 Генерация изображения... Это может занять до минуты")
 
         try:
             if message.voice:
-                # Обработка голосового сообщения
                 file_id = message.voice.file_id
                 file = await bot.get_file(file_id)
                 file_path = file.file_path
@@ -732,7 +714,6 @@ async def handle_messages(message: Message):
             else:
                 prompt = message.text
 
-            # Генерируем изображение
             result = generate_image(prompt)
 
             if not result:
