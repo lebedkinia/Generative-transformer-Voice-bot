@@ -3,3 +3,4 @@ venv
 .env
 response.wav
 message.wav
+feedback.db
